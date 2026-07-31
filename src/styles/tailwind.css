@@ -1,0 +1,22 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root{
+  --cream: #F8FAF5;
+  --green-primary: #4CAF50;
+  --green-dark: #2E5E3E;
+}
+
+/* Basic utility classes for theme */
+.bg-cream{ background-color: var(--cream); }
+.text-darkgreen{ color: var(--green-dark); }
+.font-poppins{ font-family: 'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
+
+/* Small resets for this screen */
+html,body,#root{ height:100%; }
+body{ margin:0; }
+
+/* Accessibility focus */
+:focus{ outline: 3px solid rgba(76,175,80,0.25); outline-offset: 2px; }
