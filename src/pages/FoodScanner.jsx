@@ -27,13 +27,20 @@ export default function FoodScanner() {
     try {
       const res = await analyzeFood(imageBlob);
       setResult(res);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      // keep loading a little to show animation
-      setTimeout(() => setLoading(false), 800);
+        // notify goals service that a scan occurred (increment scan goal)
+        try {
+          const goalsService = await import('../services/goalsService');
+          if (goalsService && goalsService.default) goalsService.default.incrementProgress('scan', 1);
+        } catch (e) {
+          console.warn('Could not notify goals service', e);
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        // keep loading a little to show animation
+        setTimeout(() => setLoading(false), 800);
+      }
     }
-  }
 
   return (
     <div className="min-h-screen bg-cream font-poppins text-darkgreen p-4 pb-32">
