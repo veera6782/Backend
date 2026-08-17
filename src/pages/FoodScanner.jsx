@@ -9,17 +9,36 @@ import OwlAssistant from '../components/OwlAssistant';
 import BottomNavigation from '../components/BottomNavigation';
 import { analyzeFood } from '../services/foodService';
 
-const mockRecent = [
-  { id: 1, food: 'Chicken Biryani', calories: 580, time: '2h ago', image: '/placeholder1.jpg' },
-  { id: 2, food: 'Fruit Salad', calories: 210, time: '1d ago', image: '/placeholder2.jpg' },
-  { id: 3, food: 'Oats with Banana', calories: 320, time: '2d ago', image: '/placeholder3.jpg' }
-];
-
 export default function FoodScanner() {
   const [tab, setTab] = useState('camera');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [uploadedImage, setUploadedImage] = useState(null);
+  const [scans, setScans] = useState([]);
+
+  // subscribe to real scan history
+  React.useEffect(() => {
+    let mounted = true;
+    async function loadScans() {
+      try {
+        const ss = await import('../services/scanService');
+        const s = ss.default.load();
+        if (!mounted) return;
+        setScans(s);
+        const unsub = ss.default.subscribe(list => setScans(list || []));
+        return unsub;
+      } catch (e) {
+        console.warn('No scan service available', e);
+      }
+    }
+    const maybeUnsub = loadScans();
+    return () => {
+      mounted = false;
+      if (maybeUnsub && typeof maybeUnsub.then === 'function') {
+        maybeUnsub.then(u => u && u());
+      }
+    };
+  }, []);
 
   async function handleCapture(imageBlob) {
     setLoading(true);
@@ -27,20 +46,40 @@ export default function FoodScanner() {
     try {
       const res = await analyzeFood(imageBlob);
       setResult(res);
-        // notify goals service that a scan occurred (increment scan goal)
-        try {
-          const goalsService = await import('../services/goalsService');
-          if (goalsService && goalsService.default) goalsService.default.incrementProgress('scan', 1);
-        } catch (e) {
-          console.warn('Could not notify goals service', e);
-        }
+
+      // save scan to storage
+      try {
+        const scanService = await import('../services/scanService');
+        const id = `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+        const scanObj = {
+          id,
+          name: res.food || 'Unknown',
+          calories: res.calories || 0,
+          protein: res.protein || 0,
+          carbs: res.carbs || res.carbohydrates || 0,
+          fats: res.fat || res.fats || 0,
+          image: uploadedImage || '/placeholder1.jpg',
+          timestamp: new Date().toISOString(),
+        };
+        scanService.default.addScan(scanObj);
       } catch (e) {
-        console.error(e);
-      } finally {
-        // keep loading a little to show animation
-        setTimeout(() => setLoading(false), 800);
+        console.warn('Could not persist scan result', e);
       }
+
+      // notify goals service that a scan occurred (increment scan goal)
+      try {
+        const goalsService = await import('../services/goalsService');
+        if (goalsService && goalsService.default) goalsService.default.incrementProgress('scan', 1);
+      } catch (e) {
+        console.warn('Could not notify goals service', e);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      // keep loading a little to show animation
+      setTimeout(() => setLoading(false), 800);
     }
+  }
 
   return (
     <div className="min-h-screen bg-cream font-poppins text-darkgreen p-4 pb-32">
@@ -93,9 +132,13 @@ export default function FoodScanner() {
             <button className="text-green-600 font-medium">View All ›</button>
           </div>
           <div className="mt-3 flex gap-3 overflow-x-auto py-2">
-            {mockRecent.map(item => (
-              <RecentScanCard key={item.id} item={item} />
-            ))}
+            {scans && scans.length ? (
+              scans.slice(0,5).map(item => (
+                <RecentScanCard key={item.id} item={{ id: item.id, food: item.name || item.food || 'Unknown', calories: item.calories || 0, time: new Date(item.timestamp).toLocaleString(), image: item.image || '/placeholder1.jpg' }} />
+              ))
+            ) : (
+              <div className="bg-white rounded-2xl p-4 shadow-sm text-gray-600">No recent scans yet. Try scanning your first meal!</div>
+            )}
           </div>
         </div>
       </motion.div>
