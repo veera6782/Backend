@@ -16,8 +16,8 @@ function StartupGate() {
     if (profile && profile.onboardingCompleted) {
       return <Home />;
     }
-  } catch (e) {
-    // ignore malformed profile and send user through onboarding
+  } catch (error) {
+    console.warn('Ignoring malformed profile data for onboarding check.', error);
   }
 
   return <Onboarding />;
