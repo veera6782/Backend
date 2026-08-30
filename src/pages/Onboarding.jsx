@@ -10,7 +10,7 @@ const initialForm = {
   height: '',
   weight: '',
   activityLevel: '',
-  goal: '',
+  goals: [],
   onboardingCompleted: false
 };
 
@@ -49,7 +49,7 @@ function validate(form) {
   else if (Number(form.weight) <= 10 || Number(form.weight) > 600) nextErrors.weight = 'Please enter a sensible weight';
 
   if (!form.activityLevel) nextErrors.activityLevel = 'Please select your activity level';
-  if (!form.goal) nextErrors.goal = 'Please select a goal';
+  if (!form.goals.length) nextErrors.goals = 'Please select at least one goal';
 
   return nextErrors;
 }
@@ -78,6 +78,13 @@ export default function Onboarding() {
 
   function handleBlur() {
     setErrors(validate(form));
+  }
+
+  function toggleGoal(goalKey) {
+    const goals = form.goals.includes(goalKey)
+      ? form.goals.filter((key) => key !== goalKey)
+      : [...form.goals, goalKey];
+    handleField('goals', goals);
   }
 
   function handleSubmit(e) {
@@ -255,19 +262,24 @@ export default function Onboarding() {
           </div>
 
           <div className="pt-1">
-            <label className="mb-3 block text-[14px] font-semibold text-darkgreen">7. What’s your goal?</label>
+            <label className="mb-3 block text-[14px] font-semibold text-darkgreen">
+              7. What’s your goal? <span className="font-normal text-gray-500">(Select all that apply)</span>
+            </label>
             <div className="grid grid-cols-3 gap-3">
               {goalOptions.map((option, index) => {
-                const selected = form.goal === option.key;
+                const selected = form.goals.includes(option.key);
                 return (
                   <button
                     key={option.key}
                     type="button"
-                    onClick={() => handleField('goal', option.key)}
+                    onClick={() => toggleGoal(option.key)}
                     className={`rounded-[18px] border bg-white px-3 py-4 text-left shadow-[0_6px_18px_rgba(46,94,62,0.08)] transition ${selected ? 'border-green-300 bg-green-50' : 'border-[#dfe8da]'}`}
                   >
-                    <div className="mb-3 flex h-16 items-center justify-center">
+                    <div className="mb-3 flex h-16 items-center justify-between">
                       <span className="text-3xl">{['🥗', '💪', '⚡', '🏆', '🌱'][index]}</span>
+                      <span className={`flex h-6 w-6 items-center justify-center rounded-md border text-sm ${selected ? 'border-green-600 bg-green-600 text-white' : 'border-gray-300 text-transparent'}`}>
+                        ✓
+                      </span>
                     </div>
                     <div className="text-center text-[14px] font-semibold leading-5 text-darkgreen">{option.title}</div>
                     <div className="mt-2 text-center text-[11px] leading-4 text-gray-600">{option.desc}</div>
@@ -275,7 +287,7 @@ export default function Onboarding() {
                 );
               })}
             </div>
-            {errors.goal && <div className="mt-2 text-xs text-red-600">{errors.goal}</div>}
+            {errors.goals && <div className="mt-2 text-xs text-red-600">{errors.goals}</div>}
           </div>
 
           <button
