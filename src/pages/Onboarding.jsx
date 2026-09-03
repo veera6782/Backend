@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import OwlAssistant from '../components/OwlAssistant';
 import profileService from '../services/profileService';
@@ -15,7 +15,7 @@ const initialForm = {
 };
 
 const activityOptions = [
-  { key: 'low', title: 'Lightly Active', desc: 'Walking, casual activity, 10–15 min/day' },
+  { key: 'low', title: 'Lightly Active', desc: 'Walking, casual activity, 10â€“15 min/day' },
   { key: 'moderate', title: 'Moderately Active', desc: 'Sports or active play regularly' },
   { key: 'high', title: 'Highly Active', desc: 'Frequent sports, training or vigorous activity' }
 ];
@@ -57,6 +57,7 @@ function validate(form) {
 export default function Onboarding() {
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -87,7 +88,7 @@ export default function Onboarding() {
     handleField('goals', goals);
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     const nextErrors = validate(form);
     setErrors(nextErrors);
@@ -100,8 +101,13 @@ export default function Onboarding() {
       onboardingCompleted: true
     };
 
-    profileService.save(profile);
-    navigate('/', { replace: true });
+    setIsSubmitting(true);
+    try {
+      await profileService.saveOnboardingProfile(profile);
+      navigate('/', { replace: true });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -110,9 +116,9 @@ export default function Onboarding() {
         <div className="flex items-center justify-between px-1 pt-1 text-[15px] font-semibold text-darkgreen">
           <span>9:41</span>
           <div className="flex items-center gap-2 text-lg">
-            <span>◔</span>
-            <span>▣</span>
-            <span>◍</span>
+            <span>â—”</span>
+            <span>â–£</span>
+            <span>â—</span>
           </div>
         </div>
 
@@ -121,7 +127,7 @@ export default function Onboarding() {
           <div className="absolute right-10 top-10 h-10 w-10 rounded-full bg-green-100/60 blur-sm" />
           <div className="relative flex items-start justify-between gap-3">
             <div className="flex-1 pt-2">
-              <h1 className="text-[3rem] font-bold leading-[0.98] tracking-[-0.05em]">Let’s get to <br /> know you!</h1>
+              <h1 className="text-[3rem] font-bold leading-[0.98] tracking-[-0.05em]">Letâ€™s get to <br /> know you!</h1>
               <p className="mt-3 text-[16px] leading-6 text-gray-600">
                 A few details will help NutriOwl <br /> personalize your experience.
               </p>
@@ -135,9 +141,9 @@ export default function Onboarding() {
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <div className="rounded-[20px] bg-white px-4 py-3 shadow-[0_6px_18px_rgba(46,94,62,0.08)] ring-1 ring-black/5">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-lg shadow-inner">👤</div>
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-lg shadow-inner">ðŸ‘¤</div>
               <div className="flex-1">
-                <label className="block text-[14px] font-semibold text-darkgreen">1. What’s your name?</label>
+                <label className="block text-[14px] font-semibold text-darkgreen">1. Whatâ€™s your name?</label>
                 <input
                   type="text"
                   value={form.name}
@@ -153,9 +159,9 @@ export default function Onboarding() {
 
           <div className="rounded-[20px] bg-white px-4 py-3 shadow-[0_6px_18px_rgba(46,94,62,0.08)] ring-1 ring-black/5">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-lg shadow-inner">✉️</div>
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-lg shadow-inner">âœ‰ï¸</div>
               <div className="flex-1">
-                <label className="block text-[14px] font-semibold text-darkgreen">2. What’s your Gmail ID / Email?</label>
+                <label className="block text-[14px] font-semibold text-darkgreen">2. Whatâ€™s your Gmail ID / Email?</label>
                 <input
                   type="email"
                   value={form.email}
@@ -172,7 +178,7 @@ export default function Onboarding() {
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-[20px] bg-white px-4 py-3 shadow-[0_6px_18px_rgba(46,94,62,0.08)] ring-1 ring-black/5">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-lg shadow-inner">🗓️</div>
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-lg shadow-inner">ðŸ—“ï¸</div>
                 <div className="flex-1">
                   <label className="block text-[14px] font-semibold text-darkgreen">3. How old are you?</label>
                   <div className="mt-2 flex items-center gap-2">
@@ -194,9 +200,9 @@ export default function Onboarding() {
 
             <div className="rounded-[20px] bg-white px-4 py-3 shadow-[0_6px_18px_rgba(46,94,62,0.08)] ring-1 ring-black/5">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-lg shadow-inner">📏</div>
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-lg shadow-inner">ðŸ“</div>
                 <div className="flex-1">
-                  <label className="block text-[14px] font-semibold text-darkgreen">4. What’s your height?</label>
+                  <label className="block text-[14px] font-semibold text-darkgreen">4. Whatâ€™s your height?</label>
                   <div className="mt-2 flex items-center gap-2">
                     <input
                       type="text"
@@ -217,9 +223,9 @@ export default function Onboarding() {
 
           <div className="rounded-[20px] bg-white px-4 py-3 shadow-[0_6px_18px_rgba(46,94,62,0.08)] ring-1 ring-black/5">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-lg shadow-inner">⚖️</div>
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-lg shadow-inner">âš–ï¸</div>
               <div className="flex-1">
-                <label className="block text-[14px] font-semibold text-darkgreen">5. What’s your weight?</label>
+                <label className="block text-[14px] font-semibold text-darkgreen">5. Whatâ€™s your weight?</label>
                 <div className="mt-2 flex items-center gap-2">
                   <input
                     type="text"
@@ -238,7 +244,7 @@ export default function Onboarding() {
           </div>
 
           <div className="pt-1">
-            <label className="mb-3 block text-[14px] font-semibold text-darkgreen">6. What’s your daily activity level?</label>
+            <label className="mb-3 block text-[14px] font-semibold text-darkgreen">6. Whatâ€™s your daily activity level?</label>
             <div className="grid grid-cols-3 gap-3">
               {activityOptions.map((option) => {
                 const selected = form.activityLevel === option.key;
@@ -250,7 +256,7 @@ export default function Onboarding() {
                     className={`rounded-[18px] border bg-white px-3 py-4 text-left shadow-[0_6px_18px_rgba(46,94,62,0.08)] transition ${selected ? 'border-green-300 bg-green-50' : 'border-[#dfe8da]'}`}
                   >
                     <div className="mb-3 flex h-16 items-center justify-center">
-                      <span className="text-4xl">{option.key === 'low' ? '🐣' : option.key === 'moderate' ? '🦉' : '🏋️'}</span>
+                      <span className="text-4xl">{option.key === 'low' ? 'ðŸ£' : option.key === 'moderate' ? 'ðŸ¦‰' : 'ðŸ‹ï¸'}</span>
                     </div>
                     <div className="text-center text-[14px] font-semibold text-darkgreen">{option.title}</div>
                     <div className="mt-2 text-center text-[11px] leading-4 text-gray-600">{option.desc}</div>
@@ -263,7 +269,7 @@ export default function Onboarding() {
 
           <div className="pt-1">
             <label className="mb-3 block text-[14px] font-semibold text-darkgreen">
-              7. What’s your goal? <span className="font-normal text-gray-500">(Select all that apply)</span>
+              7. Whatâ€™s your goal? <span className="font-normal text-gray-500">(Select all that apply)</span>
             </label>
             <div className="grid grid-cols-3 gap-3">
               {goalOptions.map((option, index) => {
@@ -276,9 +282,9 @@ export default function Onboarding() {
                     className={`rounded-[18px] border bg-white px-3 py-4 text-left shadow-[0_6px_18px_rgba(46,94,62,0.08)] transition ${selected ? 'border-green-300 bg-green-50' : 'border-[#dfe8da]'}`}
                   >
                     <div className="mb-3 flex h-16 items-center justify-between">
-                      <span className="text-3xl">{['🥗', '💪', '⚡', '🏆', '🌱'][index]}</span>
+                      <span className="text-3xl">{['ðŸ¥—', 'ðŸ’ª', 'âš¡', 'ðŸ†', 'ðŸŒ±'][index]}</span>
                       <span className={`flex h-6 w-6 items-center justify-center rounded-md border text-sm ${selected ? 'border-green-600 bg-green-600 text-white' : 'border-gray-300 text-transparent'}`}>
-                        ✓
+                        âœ“
                       </span>
                     </div>
                     <div className="text-center text-[14px] font-semibold leading-5 text-darkgreen">{option.title}</div>
@@ -292,19 +298,21 @@ export default function Onboarding() {
 
           <button
             type="submit"
-            disabled={!canSubmit}
+            disabled={!canSubmit || isSubmitting}
             className={`mt-4 flex w-full items-center justify-center rounded-full bg-green-600 px-6 py-4 text-center text-[26px] font-bold text-white shadow-[0_10px_20px_rgba(76,175,80,0.25)] transition ${!canSubmit ? 'cursor-not-allowed bg-[#a9d9aa]' : 'hover:bg-green-700'}`}
           >
-            <span>Continue</span>
-            <span className="ml-3 text-2xl">→</span>
+            <span>{isSubmitting ? 'Saving...' : 'Continue'}</span>
+            <span className="ml-3 text-2xl">â†’</span>
           </button>
         </form>
 
         <div className="mt-4 flex items-center justify-center gap-2 pb-4 text-[12px] text-gray-500">
-          <span>🔒</span>
+          <span>ðŸ”’</span>
           <span>Your information is safe with NutriOwl</span>
         </div>
       </div>
     </div>
   );
 }
+
+

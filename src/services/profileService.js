@@ -1,4 +1,4 @@
-import goalsService from './goalsService';
+﻿import goalsService from './goalsService';
 
 const STORAGE_KEY = 'nutriowl_profile';
 const SCAN_HISTORY_KEY = 'nutriowl_scan_history';
@@ -276,9 +276,30 @@ export function clear() {
   return defaultProfile;
 }
 
+
+export async function saveOnboardingProfile(profile) {
+  const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '')
+  try {
+    const response = await fetch(`${apiUrl}/api/users`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(profile)
+    })
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}))
+      throw new Error(body.message || `Profile request failed (${response.status})`)
+    }
+    const data = await response.json()
+    return saveProfile({ ...profile, id: data.user.id })
+  } catch (error) {
+    console.warn('Profile API unavailable; saving locally instead.', error)
+    return saveProfile(profile)
+  }
+}
 export default {
   load,
   save,
+  saveOnboardingProfile,
   clear,
   loadProfile,
   saveProfile,
@@ -290,3 +311,4 @@ export default {
   getScanHistory,
   getDefaultProfile
 };
+
