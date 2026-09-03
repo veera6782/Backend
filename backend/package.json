@@ -1,0 +1,17 @@
+{
+  "name": "nutriowl-backend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch server.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^5.1.0",
+    "mongodb": "^7.6.0",
+    "mongoose": "^8.12.1"
+  }
+}
