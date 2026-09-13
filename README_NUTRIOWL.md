@@ -1,24 +1,26 @@
 # NutriOwl Backend
 
-This repository contains the Flask API used for food image detection.
+This repository contains the Node.js and Express API for NutriOwl user data.
 
 ## Run locally
 
 ```bash
-source .venv/bin/activate
-python backend/app.py
+npm install
+npm start
 ```
 
-The API listens on `http://127.0.0.1:5001` by default. Set `PORT` to use a
-different port and `YOLO_MODEL` to select another model file.
+Before starting the server, copy `.env.example` to `.env` and set a valid
+`MONGODB_URI`. The API listens on `http://127.0.0.1:5000` by default.
 
 ## Endpoints
 
-- `GET /health` checks that the API and model are available.
-- `POST /predict` accepts an image in a multipart form field named `image`.
+- `GET /api/health` checks that the API is available.
+- `GET /api/users/:id` retrieves a user.
+- `POST /api/users` creates a user.
+- `PATCH /api/users/:id` updates a user.
 
 Example health check:
 
 ```bash
-curl http://127.0.0.1:5001/health
+curl http://127.0.0.1:5000/api/health
 ```
