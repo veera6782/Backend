@@ -1,24 +1,24 @@
-NutriOwl - Food Scanner screen
+# NutriOwl Backend
 
-Files created under src/ for the Food Scanner screen prototype:
+This repository contains the Flask API used for food image detection.
 
-- src/index.js
-- src/App.jsx
-- src/pages/FoodScanner.jsx
-- src/components/CameraPreview.jsx
-- src/components/UploadButton.jsx
-- src/components/ScanButton.jsx
-- src/components/TipsCard.jsx
-- src/components/RecentScanCard.jsx
-- src/components/OwlAssistant.jsx
-- src/components/BottomNavigation.jsx
-- src/services/foodService.js
-- src/hooks/useCamera.js
-- src/styles/tailwind.css
+## Run locally
 
-Notes:
-- The design elements (colors, spacing, rounded corners) are expressed using Tailwind classes and a few helper CSS variables.
-- The Owl images (owl.png, owl-smile.png) and recent scan placeholders (placeholder1.jpg...) are referenced; replace them with assets in public/ or adjust paths.
-- analyzeFood in services returns mocked JSON and simulates latency.
-- Framer Motion is used for subtle animations and the loading overlay.
-- This is a component-level implementation. To run as a full app, ensure React, React Router, Framer Motion, Tailwind and other deps are installed and tailwind is configured in your build pipeline.
+```bash
+source .venv/bin/activate
+python backend/app.py
+```
+
+The API listens on `http://127.0.0.1:5001` by default. Set `PORT` to use a
+different port and `YOLO_MODEL` to select another model file.
+
+## Endpoints
+
+- `GET /health` checks that the API and model are available.
+- `POST /predict` accepts an image in a multipart form field named `image`.
+
+Example health check:
+
+```bash
+curl http://127.0.0.1:5001/health
+```
