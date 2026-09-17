@@ -17,6 +17,7 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' })
 })
 app.use('/api/users', userRoutes)
+app.use('/api/profile', userRoutes)
 app.use(notFound)
 app.use(errorHandler)
 
