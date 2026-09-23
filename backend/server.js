@@ -4,6 +4,7 @@ import express from 'express'
 import { connectDatabase } from './config/database.js'
 import { errorHandler, notFound } from './middleware/errorMiddleware.js'
 import userRoutes from './routes/userRoutes.js'
+import foodRoutes from './routes/foodRoutes.js'
 
 dns.setServers(['8.8.8.8', '8.8.4.4'])
 const app = express()
@@ -17,6 +18,7 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' })
 })
 app.use('/api/users', userRoutes)
+app.use('/api/food', foodRoutes)
 app.use(notFound)
 app.use(errorHandler)
 
