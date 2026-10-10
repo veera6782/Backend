@@ -1,4 +1,5 @@
 import { createServer as createHttpServer } from 'node:http';
+import { analyzeFood } from './foodAnalysis.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createJsonStore, createMongoStore } from './dataStore.js';
@@ -6,7 +7,6 @@ import {
   addScan,
   buildWellnessPlan,
   chatResponse,
-  demoFoodAnalysis,
   ensureUser,
   goalsResponse,
   resetDailyGoals,
@@ -95,7 +95,7 @@ export function createServer({
         : {};
 
       if (request.method === 'POST' && url.pathname === '/api/food/analyze') {
-        return sendJson(response, 200, demoFoodAnalysis(), corsOrigin);
+        return sendJson(response, 200, await analyzeFood(body), corsOrigin);
       }
       if (request.method === 'POST' && url.pathname === '/api/chat') {
         const text = body.text ?? body.message;
