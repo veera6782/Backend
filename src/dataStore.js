@@ -12,9 +12,12 @@ async function readDatabase(filePath) {
     if (!parsed.users || typeof parsed.users !== 'object' || Array.isArray(parsed.users)) {
       parsed.users = {};
     }
+    if (!parsed.sessions || typeof parsed.sessions !== 'object' || Array.isArray(parsed.sessions)) {
+      parsed.sessions = {};
+    }
     return parsed;
   } catch (error) {
-    if (error.code === 'ENOENT') return { version: 1, users: {} };
+    if (error.code === 'ENOENT') return { version: 1, users: {}, sessions: {} };
     throw error;
   }
 }
@@ -73,7 +76,7 @@ export function createMongoStore(uri, databaseName, MongoClientImplementation = 
         const collection = await getCollection();
         await collection.updateOne(
           { _id: 'primary' },
-          { $setOnInsert: { _revision: 0, state: { version: 1, users: {} } } },
+          { $setOnInsert: { _revision: 0, state: { version: 1, users: {}, sessions: {} } } },
           { upsert: true }
         );
 

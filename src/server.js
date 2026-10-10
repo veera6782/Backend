@@ -1,5 +1,15 @@
 import { createServer as createHttpServer } from 'node:http';
 import { analyzeFood } from './foodAnalysis.js';
+import {
+  AuthError,
+  createSession,
+  getSessionKey,
+  hashPassword,
+  resolveSessionEmail,
+  validateEmail,
+  validatePassword,
+  verifyPassword
+} from './auth.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createJsonStore, createMongoStore } from './dataStore.js';
@@ -17,17 +27,16 @@ import {
 
 const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
 const defaultDataFile = path.resolve(moduleDirectory, '../data/nutriowl.json');
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function httpError(status, message) {
-  return Object.assign(new Error(message), { status });
+  return new AuthError(status, message);
 }
 
 function sendJson(response, status, body, corsOrigin) {
   response.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': corsOrigin,
-    'Access-Control-Allow-Headers': 'Content-Type, X-User-Email',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
     'Cache-Control': 'no-store'
   });
@@ -53,15 +62,6 @@ async function readJsonBody(request, maxBodyBytes) {
   }
 }
 
-function resolveUserEmail(request, defaultUserEmail) {
-  const headerValue = String(request.headers['x-user-email'] || '').trim().toLowerCase();
-  const email = headerValue || defaultUserEmail;
-  if (!emailPattern.test(email) || email.length > 254) {
-    throw httpError(400, 'A valid X-User-Email header is required.');
-  }
-  return email;
-}
-
 function errorStatus(error) {
   return Number.isInteger(error.status) ? error.status : 500;
 }
@@ -71,9 +71,12 @@ export function createServer({
   mongoUri = process.env.MONGODB_URI || '',
   mongoDatabase = process.env.MONGODB_DATABASE,
   corsOrigin = process.env.CORS_ORIGIN || 'https://nutriowl.netlify.app',
-  defaultUserEmail = process.env.DEFAULT_USER_EMAIL || 'demo@nutriowl.local',
+  sessionTtlMs = Number(process.env.AUTH_SESSION_TTL_MS || 7 * 24 * 60 * 60 * 1000),
   maxBodyBytes = 10 * 1024 * 1024
 } = {}) {
+  if (!Number.isSafeInteger(sessionTtlMs) || sessionTtlMs <= 0) {
+    throw new Error('AUTH_SESSION_TTL_MS must be a positive integer.');
+  }
   const store = mongoUri
     ? createMongoStore(mongoUri, mongoDatabase)
     : createJsonStore(dataFile);
@@ -93,20 +96,67 @@ export function createServer({
       const body = ['POST', 'PUT', 'PATCH'].includes(request.method)
         ? await readJsonBody(request, maxBodyBytes)
         : {};
+      const pathname = url.pathname;
 
-      if (request.method === 'POST' && url.pathname === '/api/food/analyze') {
+      if (request.method === 'POST' && ['/api/auth/signup', '/api/auth/signin'].includes(pathname)) {
+        const email = validateEmail(body.email);
+        const password = validatePassword(body.password, { signup: pathname === '/api/auth/signup' });
+
+        if (pathname === '/api/auth/signup') {
+          const passwordHash = await hashPassword(password);
+          const session = createSession(email, sessionTtlMs);
+          const result = await store.transact(database => {
+            database.users ||= {};
+            if (database.users[email]) {
+              throw httpError(409, 'An account with this email already exists. Passwordless legacy accounts must be migrated before they can be used.');
+            }
+            const user = ensureUser(database, email);
+            user.passwordHash = passwordHash;
+            database.sessions ||= {};
+            database.sessions[session.key] = session.record;
+            return { token: session.token, profile: user.profile };
+          });
+          return sendJson(response, 201, result, corsOrigin);
+        }
+
+        const session = createSession(email, sessionTtlMs);
+        const result = await store.transact(async database => {
+          const user = database.users[email];
+          if (!await verifyPassword(password, user?.passwordHash)) {
+            throw httpError(401, 'Invalid email or password.');
+          }
+          database.sessions ||= {};
+          database.sessions[session.key] = session.record;
+          return { token: session.token, profile: user.profile };
+        });
+        return sendJson(response, 200, result, corsOrigin);
+      }
+
+      if (request.method === 'POST' && pathname === '/api/auth/signout') {
+        const sessionKey = getSessionKey(request.headers.authorization);
+        const result = await store.transact(database => {
+          const email = resolveSessionEmail(database, sessionKey);
+          if (!email) return { status: 401, body: { error: 'A valid bearer token is required.' } };
+          delete database.sessions[sessionKey];
+          return { status: 200, body: { success: true } };
+        });
+        return sendJson(response, result.status, result.body, corsOrigin);
+      }
+
+      if (request.method === 'POST' && pathname === '/api/food/analyze') {
         return sendJson(response, 200, await analyzeFood(body), corsOrigin);
       }
-      if (request.method === 'POST' && url.pathname === '/api/chat') {
+      if (request.method === 'POST' && pathname === '/api/chat') {
         const text = body.text ?? body.message;
         return sendJson(response, 200, { response: chatResponse(text) }, corsOrigin);
       }
 
-      const email = resolveUserEmail(request, defaultUserEmail);
+      const sessionKey = getSessionKey(request.headers.authorization);
       const result = await store.transact(database => {
+        const email = resolveSessionEmail(database, sessionKey);
+        if (!email) return { status: 401, body: { error: 'A valid bearer token is required.' } };
         const user = ensureUser(database, email);
         const method = request.method;
-        const pathname = url.pathname;
 
         if (pathname === '/api/profile' && method === 'GET') return { status: 200, body: user.profile };
         if (pathname === '/api/profile' && ['POST', 'PUT'].includes(method)) {
