@@ -1,5 +1,6 @@
 import { createServer as createHttpServer } from 'node:http';
 import { analyzeFood } from './foodAnalysis.js';
+import { createChatClient } from './chat.js';
 import {
   AuthError,
   createSession,
@@ -16,7 +17,6 @@ import { createJsonStore, createMongoStore } from './dataStore.js';
 import {
   addScan,
   buildWellnessPlan,
-  chatResponse,
   ensureUser,
   goalsResponse,
   resetDailyGoals,
@@ -72,7 +72,8 @@ export function createServer({
   mongoDatabase = process.env.MONGODB_DATABASE,
   corsOrigin = process.env.CORS_ORIGIN || 'https://nutriowl.netlify.app',
   sessionTtlMs = Number(process.env.AUTH_SESSION_TTL_MS || 7 * 24 * 60 * 60 * 1000),
-  maxBodyBytes = 10 * 1024 * 1024
+  maxBodyBytes = 10 * 1024 * 1024,
+  chatClient = createChatClient()
 } = {}) {
   if (!Number.isSafeInteger(sessionTtlMs) || sessionTtlMs <= 0) {
     throw new Error('AUTH_SESSION_TTL_MS must be a positive integer.');
@@ -147,8 +148,23 @@ export function createServer({
         return sendJson(response, 200, await analyzeFood(body), corsOrigin);
       }
       if (request.method === 'POST' && pathname === '/api/chat') {
-        const text = body.text ?? body.message;
-        return sendJson(response, 200, { response: chatResponse(text) }, corsOrigin);
+        // Signed-in members get personalized replies; anonymous requests remain supported.
+        let user = null;
+        let limitKey = `ip:${request.socket.remoteAddress}`;
+        if (request.headers.authorization) {
+          const sessionKey = getSessionKey(request.headers.authorization);
+          const member = await store.transact(database => {
+            const email = resolveSessionEmail(database, sessionKey);
+            if (!email) return null;
+            const record = ensureUser(database, email);
+            resetDailyGoals(record);
+            return structuredClone({ email, profile: record.profile, goalItems: record.goalItems, scans: record.scans });
+          });
+          if (!member) throw httpError(401, 'A valid bearer token is required.');
+          user = member;
+          limitKey = `user:${member.email}`;
+        }
+        return sendJson(response, 200, await chatClient.reply({ body, user, limitKey }), corsOrigin);
       }
 
       const sessionKey = getSessionKey(request.headers.authorization);

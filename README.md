@@ -26,6 +26,11 @@ The API listens on port `3002` by default, matching the Vite `/api` proxy.
 | `NUTRIOWL_DATA_FILE` | `data/nutriowl.json` | JSON store path when MongoDB is not configured |
 | `CORS_ORIGIN` | `https://nutriowl.netlify.app` | Allowed browser origin |
 | `AUTH_SESSION_TTL_MS` | `604800000` (7 days) | Session lifetime in milliseconds |
+| `CHAT_API_KEY` (or `GEMINI_API_KEY`) | unset | Key for the chat model; without it `/api/chat` uses rule-based replies |
+| `CHAT_API_URL` | Gemini OpenAI-compatible endpoint | Any OpenAI-compatible `/chat/completions` URL (Gemini, Groq, OpenRouter, Ollama) |
+| `CHAT_MODEL` | `gemini-flash-latest,gemini-flash-lite-latest` | Comma-separated model names; the next is tried when one is overloaded (5xx), rate limited (429) or unavailable (404) |
+| `CHAT_DAILY_LIMIT` | `50` | Chat messages per member (or per client IP when anonymous) per day |
+| `CHAT_MAX_TOKENS` | `1024` | Maximum reply length in tokens |
 
 When `MONGODB_URI` is configured, the backend stores application state, password hashes, and expiring sessions in the `nutriowl_state` collection as one document and uses revision checks to protect concurrent updates across backend instances. The MongoDB database must be created or accessible to the supplied credentials. Without `MONGODB_URI`, the local JSON store is created on the first request and written atomically; use that mode for local development only. Keep the backing database persistent across deployments, and use MongoDB for a multi-instance production service.
 
@@ -57,7 +62,7 @@ All responses use JSON. Profile, goals, and scan routes require a bearer token.
 | `GET`, `DELETE` | `/api/scans/:id` | Read or delete one scan |
 | `DELETE` | `/api/scans` | Clear scan history |
 | `POST` | `/api/food/analyze` | Return a demo nutrition estimate |
-| `POST` | `/api/chat` | Return a rule-based nutrition response for `{ "text": "..." }` |
+| `POST` | `/api/chat` | Nutrition assistant reply for `{ "text": "..." }` or `{ "messages": [...] }`; returns `{ "response", "source" }` |
 
 Example:
 
@@ -70,7 +75,17 @@ curl http://localhost:3002/api/goals \
   -H 'Authorization: Bearer <token>'
 ```
 
-`POST /api/food/analyze` currently returns the same sample chicken-salad result as the frontend prototype. It does not inspect the submitted image. `/api/chat` uses a small rule-based response set, not an AI model. Scan records keep metadata and a short image path/URL; data URLs are replaced with the placeholder path to avoid storing large image payloads in the JSON database.
+`POST /api/food/analyze` currently returns the same sample chicken-salad result as the frontend prototype. It does not inspect the submitted image. Scan records keep metadata and a short image path/URL; data URLs are replaced with the placeholder path to avoid storing large image payloads in the JSON database.
+
+## Chat Assistant
+
+`POST /api/chat` is a conversational nutrition and wellness assistant. Send the conversation as `{ "messages": [{ "role": "user" | "assistant", "content": "..." }, ...] }` with the newest user message last (the most recent 20 are used, each up to 2,000 characters), or a single `{ "text": "..." }`. The backend is stateless, so the client keeps the history.
+
+The bearer token is optional. When present, replies are personalized with the member's profile, goal progress and today's scanned meals, and the daily limit is counted per member; an invalid token returns `401`. Anonymous requests are limited per client IP. Behind a proxy all anonymous traffic shares one IP, so send the token from the frontend.
+
+The response's `source` is `ai` (model reply), `fallback` (rule-based reply because no key is configured or the provider failed or was rate limited) or `safety` (a fixed support message for self-harm or eating-disorder crisis language; the model is not called). Exceeding the daily limit returns `429`. Daily counters are kept in memory and reset when the process restarts.
+
+Free setup: create a Gemini API key in Google AI Studio and set `CHAT_API_KEY`. To use Groq instead, set `CHAT_API_URL=https://api.groq.com/openai/v1/chat/completions` and a Groq model in `CHAT_MODEL`. Free tiers have rate limits, and providers may use free-tier prompts to improve their models.
 
 ## Moving The Backend
 

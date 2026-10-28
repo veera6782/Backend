@@ -4,6 +4,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { createServer } from '../src/server.js';
+import { createChatClient } from '../src/chat.js';
 
 let server;
 let baseUrl;
@@ -24,7 +25,7 @@ before(async () => {
       }
     }
   }));
-  server = createServer({ dataFile, mongoUri: '' });
+  server = createServer({ dataFile, mongoUri: '', chatClient: createChatClient({ apiKey: '' }) });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   baseUrl = `http://127.0.0.1:${server.address().port}`;
 });
@@ -261,6 +262,7 @@ test('chat and food analysis remain public and frontend-compatible', async () =>
   const chat = await api('/api/chat', { method: 'POST', body: { text: 'What are some protein foods?' } });
   assert.equal(chat.status, 200);
   assert.match(chat.body.response, /protein/i);
+  assert.equal(chat.body.source, 'fallback');
 
   const food = await api('/api/food/analyze', { method: 'POST', body: { image: 'sample' } });
   assert.equal(food.status, 200);
