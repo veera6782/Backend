@@ -100,25 +100,37 @@ export function createChatClient({
 
   async function complete(messages, context) {
     const system = context ? `${systemPrompt}\n\n${context}` : systemPrompt;
-    for (const name of models) {
-      const res = await fetchImpl(apiUrl, {
-        method: 'POST',
-        signal: AbortSignal.timeout(timeoutMs),
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({
-          model: name,
-          max_tokens: maxTokens,
-          temperature: 0.6,
-          messages: [{ role: 'system', content: system }, ...messages]
-        })
-      });
-      if (!res.ok) {
-        console.error('Chat API error', name, res.status, (await res.text()).slice(0, 500));
-        if ([404, 429].includes(res.status) || res.status >= 500) continue;
-        return null;
+    // timeoutMs is the budget for the whole reply. Each model gets an equal share of what
+    // is left, so a slow or hung model still leaves time to try the next one.
+    const deadline = Date.now() + timeoutMs;
+    for (const [index, name] of models.entries()) {
+      const attemptMs = Math.floor((deadline - Date.now()) / (models.length - index));
+      if (attemptMs <= 0) break;
+      try {
+        const res = await fetchImpl(apiUrl, {
+          method: 'POST',
+          signal: AbortSignal.timeout(attemptMs),
+          headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify({
+            model: name,
+            max_tokens: maxTokens,
+            temperature: 0.6,
+            messages: [{ role: 'system', content: system }, ...messages]
+          })
+        });
+        if (!res.ok) {
+          console.error('Chat API error', name, res.status, (await res.text()).slice(0, 500));
+          if ([404, 429].includes(res.status) || res.status >= 500) continue;
+          return null;
+        }
+        const text = (await res.json()).choices?.[0]?.message?.content;
+        if (typeof text === 'string' && text.trim()) return text.trim();
+        console.error('Chat API returned an empty reply', name);
+      } catch (error) {
+        // Timed out or failed to connect: move on to the next model.
+        const reason = error.name === 'TimeoutError' ? `timed out after ${attemptMs} ms` : error.message;
+        console.error('Chat API request failed', name, reason);
       }
-      const text = (await res.json()).choices?.[0]?.message?.content;
-      return typeof text === 'string' && text.trim() ? text.trim() : null;
     }
     return null;
   }
