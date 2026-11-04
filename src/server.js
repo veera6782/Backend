@@ -144,6 +144,42 @@ export function createServer({
         return sendJson(response, result.status, result.body, corsOrigin);
       }
 
+      // Links a parent account to the signed-in child, creating the parent account when
+      // createAccount is true or verifying the existing parent's password otherwise.
+      // The child's session is unchanged; no parent session is issued.
+      if (request.method === 'POST' && pathname === '/api/auth/link-parent') {
+        const sessionKey = getSessionKey(request.headers.authorization);
+        const parentEmail = validateEmail(body.email);
+        const createAccount = body.createAccount === true;
+        const password = validatePassword(body.password, { signup: createAccount });
+        const passwordHash = createAccount ? await hashPassword(password) : null;
+        const result = await store.transact(async database => {
+          const childEmail = resolveSessionEmail(database, sessionKey);
+          if (!childEmail) return { status: 401, body: { error: 'A valid bearer token is required.' } };
+          if (parentEmail === childEmail) throw httpError(400, 'The parent email must be different from your own.');
+
+          let parent;
+          if (createAccount) {
+            if (database.users[parentEmail]) throw httpError(409, 'An account with this email already exists. Sign in to link it instead.');
+            parent = ensureUser(database, parentEmail);
+            parent.passwordHash = passwordHash;
+          } else {
+            parent = database.users[parentEmail];
+            if (!await verifyPassword(password, parent?.passwordHash)) throw httpError(401, 'Invalid email or password.');
+          }
+
+          const child = ensureUser(database, childEmail);
+          const previousParent = child.parentEmail && database.users[child.parentEmail];
+          if (previousParent && child.parentEmail !== parentEmail) {
+            previousParent.children = (previousParent.children || []).filter(email => email !== childEmail);
+          }
+          child.parentEmail = parentEmail;
+          parent.children = [...new Set([...(parent.children || []), childEmail])];
+          return { status: createAccount ? 201 : 200, body: { parent: { email: parentEmail }, profile: child.profile } };
+        });
+        return sendJson(response, result.status, result.body, corsOrigin);
+      }
+
       if (request.method === 'POST' && pathname === '/api/food/analyze') {
         return sendJson(response, 200, await analyzeFood(body), corsOrigin);
       }

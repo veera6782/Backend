@@ -52,6 +52,7 @@ All responses use JSON. Profile, goals, and scan routes require a bearer token.
 | `POST` | `/api/auth/signup` | Create an account and return a bearer token and profile |
 | `POST` | `/api/auth/signin` | Authenticate and return a bearer token and profile |
 | `POST` | `/api/auth/signout` | Revoke the bearer session |
+| `POST` | `/api/auth/link-parent` | Link a parent to the signed-in child: `{ "email", "password", "createAccount" }` creates the parent account (`201`) or verifies an existing one (`200`) |
 | `GET`, `POST`, `PUT` | `/api/profile` | Read or save profile and preferences |
 | `GET` | `/api/goals` | Return goal items, fruit preference, hydration reminder, and wellness plan |
 | `POST` | `/api/goals/generate` | Regenerate the wellness plan |

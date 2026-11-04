@@ -93,6 +93,28 @@ test('signup creates an account and duplicate signup is rejected', async () => {
   assert.equal(invalid.status, 400);
 });
 
+test('a signed-in child can create or link a parent account', async () => {
+  const child = await signup('child@example.test');
+  const link = body => api('/api/auth/link-parent', { method: 'POST', token: child.body.token, body });
+
+  assert.equal((await api('/api/auth/link-parent', { method: 'POST', body: { email: 'p@example.test', password: 'secure-password-123', createAccount: true } })).status, 401);
+  assert.equal((await link({ email: 'child@example.test', password: 'secure-password-123', createAccount: true })).status, 400);
+
+  const created = await link({ email: 'parent@example.test', password: 'parent-password-123', createAccount: true });
+  assert.equal(created.status, 201);
+  assert.equal(created.body.parent.email, 'parent@example.test');
+  assert.equal((await link({ email: 'parent@example.test', password: 'parent-password-123', createAccount: true })).status, 409);
+
+  assert.equal((await link({ email: 'parent@example.test', password: 'wrong-password', createAccount: false })).status, 401);
+  assert.equal((await link({ email: 'parent@example.test', password: 'parent-password-123', createAccount: false })).status, 200);
+
+  const parentSignin = await api('/api/auth/signin', { method: 'POST', body: { email: 'parent@example.test', password: 'parent-password-123' } });
+  assert.equal(parentSignin.status, 200);
+  const database = JSON.parse(await readFile(dataFile, 'utf8'));
+  assert.equal(database.users['child@example.test'].parentEmail, 'parent@example.test');
+  assert.deepEqual(database.users['parent@example.test'].children, ['child@example.test']);
+});
+
 test('passwordless legacy accounts are not silently claimable', async () => {
   const result = await signup('legacy@example.test');
   assert.equal(result.status, 409);
