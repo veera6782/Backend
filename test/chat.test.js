@@ -112,6 +112,68 @@ test('overloaded models fall through to the next configured model', async () => 
   assert.deepEqual(attempts, ['busy-model', 'backup-model']);
 });
 
+// A fetch that never answers until its abort signal fires, like a hung provider.
+function hangUntilAborted(options) {
+  return new Promise((_, reject) => {
+    options.signal.addEventListener('abort', () => reject(options.signal.reason));
+  });
+}
+
+test('a model that times out falls through to the next model within the time budget', async () => {
+  const attempts = [];
+  const client = createChatClient({
+    apiKey: 'test-key',
+    model: 'slow-model,backup-model',
+    timeoutMs: 400,
+    fetchImpl: (url, options) => {
+      const { model } = JSON.parse(options.body);
+      attempts.push(model);
+      return model === 'slow-model' ? hangUntilAborted(options) : Promise.resolve(okReply('Backup answer')());
+    }
+  });
+  const started = Date.now();
+  const result = await client.reply({ body: { text: 'Hi' }, user: null, limitKey: 'timeout-test' });
+  assert.deepEqual(result, { response: 'Backup answer', source: 'ai' });
+  assert.deepEqual(attempts, ['slow-model', 'backup-model']);
+  // The slow model only gets its share (half) of the budget.
+  assert.ok(Date.now() - started < 400, `took ${Date.now() - started} ms`);
+});
+
+test('a network error or empty reply falls through to the next model', async () => {
+  for (const firstAttempt of [
+    () => Promise.reject(new TypeError('fetch failed')),
+    () => Promise.resolve(okReply('   ')())
+  ]) {
+    const attempts = [];
+    const client = createChatClient({
+      apiKey: 'test-key',
+      model: 'flaky-model,backup-model',
+      fetchImpl: (url, options) => {
+        const { model } = JSON.parse(options.body);
+        attempts.push(model);
+        return model === 'flaky-model' ? firstAttempt() : Promise.resolve(okReply('Backup answer')());
+      }
+    });
+    const result = await client.reply({ body: { text: 'Hi' }, user: null, limitKey: 'network-test' });
+    assert.deepEqual(result, { response: 'Backup answer', source: 'ai' });
+    assert.deepEqual(attempts, ['flaky-model', 'backup-model']);
+  }
+});
+
+test('when every model hangs, the fallback reply arrives within the total budget', async () => {
+  const client = createChatClient({
+    apiKey: 'test-key',
+    model: 'hung-a,hung-b',
+    timeoutMs: 300,
+    fetchImpl: (url, options) => hangUntilAborted(options)
+  });
+  const started = Date.now();
+  const result = await client.reply({ body: { text: 'Give me a snack idea' }, user: null, limitKey: 'hang-test' });
+  const elapsed = Date.now() - started;
+  assert.equal(result.source, 'fallback');
+  assert.ok(elapsed >= 250 && elapsed < 600, `took ${elapsed} ms`);
+});
+
 test('crisis messages get a fixed safety reply without calling the model', async () => {
   calls = [];
   const chat = await api('/api/chat', { body: { text: 'I keep trying to make myself throw up after meals' } });
